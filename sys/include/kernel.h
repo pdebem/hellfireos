@@ -47,7 +47,7 @@ struct tcb_entry {
 	size_t *pstack;					/*!< task stack area (bottom) */
 	uint32_t stack_size;				/*!< task stack size */
 	void *other_data;				/*!< pointer to other data related to this task */
-};
+}; 
 
 struct pcb_entry {
 	int32_t (*sched_rt)();				/*!< pointer to the realtime scheduler */

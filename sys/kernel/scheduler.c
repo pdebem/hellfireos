@@ -11,7 +11,7 @@
  * @section DESCRIPTION
  * 
  * Kernel two-level scheduler and task queue management.
- * 
+d * 
  */
 
 #include <hal.h>
@@ -87,23 +87,23 @@ void dispatch_isr(void *arg)
 	dprintf("dispatch %d ", (uint32_t)_read_us());
 #endif
 	_timer_reset();
-	if (krnl_schedule == 0) return;
-	krnl_task = &krnl_tcb[krnl_current_task];
-	rc = setjmp(krnl_task->task_context);
+	if (krnl_schedule == 0) return; // @Pedro: Flag para controle do escalonador, ativou ou inativo, se inativo retorna a função VAZIA
+	krnl_task = &krnl_tcb[krnl_current_task]; // @Pedro: recupera o ponteiro para a proxima Task da lista
+	rc = setjmp(krnl_task->task_context); // @Pedro? ACHO que coloca para processar?????
 	if (rc){
 		return;
 	}
-	if (krnl_task->state == TASK_RUNNING)
+	if (krnl_task->state == TASK_RUNNING) // @Pedro: verifica se está em RUNNING, se sim altera para READY
 		krnl_task->state = TASK_READY;
-	if (krnl_task->pstack[0] != STACK_MAGIC)
+	if (krnl_task->pstack[0] != STACK_MAGIC) //@Pedro? STACK_MAGIC ?????
 		panic(PANIC_STACK_OVERFLOW);
 	if (krnl_tasks > 0){
 		process_delay_queue();
-		krnl_current_task = krnl_pcb.sched_rt();
-		if (krnl_current_task == 0)
+		krnl_current_task = krnl_pcb.sched_rt(); //@Pedro: retorna o ponteiro para o escalonador RT
+		if (krnl_current_task == 0) //@Pedro: verifica se a tarefa corrente é de tempo real, caso contrario ela é de melhor esforço
 			krnl_current_task = krnl_pcb.sched_be();
-		krnl_task->state = TASK_RUNNING;
-		krnl_pcb.preempt_cswitch++;
+		krnl_task->state = TASK_RUNNING; //@Pedro: Coloca a nova tarefa em TASK_RUNNING
+		krnl_pcb.preempt_cswitch++; //@Pedro? Previsão de troca de contexto ???? 
 #if KERNEL_LOG >= 1
 		dprintf("\n%d %d %d %d %d ", krnl_current_task, krnl_task->period, krnl_task->capacity, krnl_task->deadline, (uint32_t)_read_us());
 #endif
@@ -241,6 +241,57 @@ int32_t sched_rma(void)
 	struct tcb_entry *e1, *e2;
 	
 	k = hf_queue_count(krnl_rt_queue);
+	if (k == 0)
+		return 0;
+		
+	for (i = 0; i < k-1; i++){
+		for (j = i + 1; j < k; j++){
+			e1 = hf_queue_get(krnl_rt_queue, i);
+			e2 = hf_queue_get(krnl_rt_queue, j);
+			if (e1->period > e2->period)
+				if (hf_queue_swap(krnl_rt_queue, i, j))
+					panic(PANIC_CANT_SWAP);
+		}
+	}
+
+	for (i = 0; i < k; i++){
+		rt_queue_next();
+		if (krnl_task->state != TASK_BLOCKED && krnl_task->capacity_rem > 0 && !id){
+			id = krnl_task->id;
+			--krnl_task->capacity_rem;
+		}
+		if (--krnl_task->deadline_rem == 0){
+			krnl_task->deadline_rem = krnl_task->period;
+			if (krnl_task->capacity_rem > 0) krnl_task->deadline_misses++;
+			krnl_task->capacity_rem = krnl_task->capacity;
+		}
+	}
+
+	if (id){
+		krnl_task = &krnl_tcb[id];
+		krnl_task->rtjobs++;
+		return id;
+	}else{
+		/* no RT task to run */
+		krnl_task = &krnl_tcb[0];
+		return 0;
+	}
+}
+
+/**
+ * @brief Polling Server (PS) scheduler.
+ * 
+ * @return aperiodic task id.
+ * 
+ */
+
+int32_t sched_ps(void)
+{
+	int32_t i, j, k;
+	uint16_t id = 0;
+	struct tcb_entry *e1, *e2;
+	
+	k = hf_queue_count(krnl_rt_queue); //@Pedro: guarda a quantidade de elementos que contem na fila RT em k
 	if (k == 0)
 		return 0;
 		
