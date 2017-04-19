@@ -232,12 +232,12 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 	if ((period < capacity) || (deadline < capacity))
 		return ERR_INVALID_PARAMETER;
 	
-	status = _di();
-	while ((krnl_tcb[i].ptask != 0) && (i < MAX_TASKS))
+	status = _di(); //@Pedro?
+	while ((krnl_tcb[i].ptask != 0) && (i < MAX_TASKS)) //@Pedro: procura lugar para colocar a tarefa na lista
 		i++;
 	if (i == MAX_TASKS){
 		kprintf("\nKERNEL: task not added - MAX_TASKS: %d", MAX_TASKS);
-		_ei(status);
+		_ei(status); //@Pedro?
 		return ERR_EXCEED_MAX_NUM;
 	}
 	krnl_tasks++;
@@ -257,19 +257,22 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 	krnl_task->bgjobs = 0;
 	krnl_task->deadline_misses = 0;
 	krnl_task->ptask = task;
-	stack_size += 3;
-	stack_size >>= 2;
-	stack_size <<= 2;
+	stack_size += 3; //@Pedro?
+	stack_size >>= 2; //@Pedro?
+	stack_size <<= 2; //@Pedro?
 	krnl_task->stack_size = stack_size;
 	krnl_task->pstack = (size_t *)hf_malloc(stack_size);
 	_set_task_sp(krnl_task->id, (size_t)krnl_task->pstack + (stack_size - 4));
 	_set_task_tp(krnl_task->id, krnl_task->ptask);
-	if (krnl_task->pstack){
+	if (krnl_task->pstack){ /*!<krnl_task->pstack = task stack area (bottom) */
 		krnl_task->pstack[0] = STACK_MAGIC;
 		kprintf("\nKERNEL: [%s], id: %d, p:%d, c:%d, d:%d, addr: %x, sp: %x, ss: %d bytes", krnl_task->name, krnl_task->id, krnl_task->period, krnl_task->capacity, krnl_task->deadline, krnl_task->ptask, _get_task_sp(krnl_task->id), stack_size);
-		if (period){
+		if (period){ //@Pedro: conforme o período a tarefa será adicionada na fila RT ou BE
 			if (hf_queue_addtail(krnl_rt_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
-		}else{
+			
+		}else if(capacity > 0 && deadline == 0) {
+			if (hf_queue_addtail(krnl_ps_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
+		}else {
 			if (hf_queue_addtail(krnl_run_queue, krnl_task)) panic(PANIC_CANT_PLACE_RUN);
 		}
 	}else{
@@ -279,7 +282,7 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 		i = ERR_OUT_OF_MEMORY;
 	}
 	krnl_task = &krnl_tcb[krnl_current_task];
-	_ei(status);
+	_ei(status); //@Pedro?
 	
 	return i;
 }
@@ -322,6 +325,52 @@ void hf_yield(void)
 	}
 }
 
+
+/**
+ * @brief Yields the current task.
+ * 
+ * The current task gives up execution and the best effort scheduler is invoked.
+ */
+void hf_polling_server(void)
+{
+	int32_t rc;
+	int32_t i, k;
+	volatile int32_t status;
+
+	status = _di();
+#if KERNEL_LOG >= 1
+		dprintf("hf_yield() %d ", (uint32_t)_read_us());
+#endif	
+	krnl_task = &krnl_tcb[krnl_current_task];
+	rc = setjmp(krnl_task->task_context);
+	if (rc){
+		_ei(status);
+		return;
+	}
+	if (krnl_task->state == TASK_RUNNING)
+		krnl_task->state = TASK_READY;
+	if (krnl_task->pstack[0] != STACK_MAGIC)
+		panic(PANIC_STACK_OVERFLOW);
+	if (krnl_tasks > 0){
+		//Size of queue
+		k = hf_queue_count(krnl_ps_queue);
+
+		if (k == 0)
+			hf_yield();
+
+		krnl_current_task = ps_queue_next();
+		krnl_task->state = TASK_RUNNING;
+		krnl_pcb.coop_cswitch++;
+#if KERNEL_LOG >= 1
+		dprintf("\n%d %d %d %d %d ", krnl_current_task, krnl_task->period, krnl_task->capacity, krnl_task->deadline, (uint32_t)_read_us());
+#endif
+		_restoreexec(krnl_task->task_context, status, krnl_current_task);
+		panic(PANIC_UNKNOWN);
+	}else{
+		panic(PANIC_NO_TASKS_LEFT);
+	}
+}
+
 /**
  * @brief Blocks a task.
  * 
@@ -340,7 +389,7 @@ int32_t hf_block(uint16_t id)
 #if KERNEL_LOG == 2
 	dprintf("hf_block() %d ", (uint32_t)_read_us());
 #endif
-	status = _di();
+	status = _di(); //@Pedro?
 	if (id == 0){
 		kprintf("\nKERNEL: can't block the idle task");
 		_ei(status);
@@ -350,18 +399,18 @@ int32_t hf_block(uint16_t id)
 	if ((krnl_task->ptask == 0) || (id >= MAX_TASKS)){
 		kprintf("\nKERNEL: task doesn't exist");
 		krnl_task = &krnl_tcb[krnl_current_task];
-		_ei(status);
+		_ei(status); //@Pedro?
 		return ERR_INVALID_ID;
 	}
 	if (krnl_task->state == TASK_BLOCKED){
 		kprintf("\nKERNEL: can't block an already blocked task");
 		krnl_task = &krnl_tcb[krnl_current_task];
-		_ei(status);
+		_ei(status); //@Pedro?
 		return ERR_ERROR;
 	}
 	krnl_task->state = TASK_BLOCKED;
 	krnl_task = &krnl_tcb[krnl_current_task];
-	_ei(status);
+	_ei(status); //@Pedro?
 	
 	return ERR_OK;
 }
@@ -385,7 +434,7 @@ int32_t hf_resume(uint16_t id)
 #if KERNEL_LOG == 2
 	dprintf("hf_resume() %d ", (uint32_t)_read_us());
 #endif
-	status = _di();
+	status = _di(); //@Pedro?
 	if (id == 0){
 		kprintf("\nKERNEL: can't resume the idle task");
 		_ei(status);

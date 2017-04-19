@@ -43,6 +43,13 @@ static void process_delay_queue(void)
 	}
 }
 
+static void ps_queue_next()
+{
+	krnl_task = hf_queue_remhead(krnl_ps_queue);
+	if (!krnl_task)
+		panic(PANIC_NO_TASKS_RT);
+}
+
 static void run_queue_next()
 {
 	krnl_task = hf_queue_remhead(krnl_run_queue);
@@ -295,30 +302,30 @@ int32_t sched_ps(void)
 	if (k == 0)
 		return 0;
 		
-	for (i = 0; i < k-1; i++){
+	for (i = 0; i < k-1; i++){ //@Pedro: ordena os elementos da fila do menor que tem o menor periodo para o que tem o maior periodo
 		for (j = i + 1; j < k; j++){
-			e1 = hf_queue_get(krnl_rt_queue, i);
-			e2 = hf_queue_get(krnl_rt_queue, j);
+			e1 = hf_queue_get(krnl_rt_queue, i); //@Pedro: pega o elemento I da fila
+			e2 = hf_queue_get(krnl_rt_queue, j); //@Pedro: pega o elemento J da fila
 			if (e1->period > e2->period)
-				if (hf_queue_swap(krnl_rt_queue, i, j))
+				if (hf_queue_swap(krnl_rt_queue, i, j)) //Pedro: faz swap entre os elementos da fila, caso o e1 tenha o periodo maior que o do e2
 					panic(PANIC_CANT_SWAP);
 		}
 	}
 
-	for (i = 0; i < k; i++){
+	for (i = 0; i < k; i++){ //@Pedro: percorre a fila de tarefas
 		rt_queue_next();
 		if (krnl_task->state != TASK_BLOCKED && krnl_task->capacity_rem > 0 && !id){
 			id = krnl_task->id;
-			--krnl_task->capacity_rem;
+			--krnl_task->capacity_rem; //@Pedro: decrementa a capacidade restante da tarefa
 		}
-		if (--krnl_task->deadline_rem == 0){
-			krnl_task->deadline_rem = krnl_task->period;
-			if (krnl_task->capacity_rem > 0) krnl_task->deadline_misses++;
-			krnl_task->capacity_rem = krnl_task->capacity;
+		if (--krnl_task->deadline_rem == 0){ //@Pedro: decrementa a deadline e continua se ainda for > 0
+			krnl_task->deadline_rem = krnl_task->period; 
+			if (krnl_task->capacity_rem > 0) krnl_task->deadline_misses++; //@Pedro: se (capacidade_restante > 0 ) incrementa deadline_misses
+			krnl_task->capacity_rem = krnl_task->capacity; // caso (capacidade_restante <= 0 ) então capacidade_restante = capacidade
 		}
 	}
 
-	if (id){
+	if (id){ //@Pedro: se o ID for válido então incrementa rtJobs
 		krnl_task = &krnl_tcb[id];
 		krnl_task->rtjobs++;
 		return id;
