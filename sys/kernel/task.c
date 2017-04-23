@@ -270,7 +270,7 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 		if (period){ //@Pedro: conforme o período a tarefa será adicionada na fila RT ou BE
 			if (hf_queue_addtail(krnl_rt_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
 		} else if(capacity > 0 && deadline == 0) {
-			//printf("Entrou aqui\n");
+
 			if (hf_queue_addtail(krnl_ps_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
 		} else {
 			if (hf_queue_addtail(krnl_run_queue, krnl_task)) panic(PANIC_CANT_PLACE_RUN);
@@ -364,7 +364,8 @@ void hf_polling_server(void)
 		else
 			krnl_task->capacity--;
 
-		krnl_current_task = ps_queue_next();
+		//Erro aqui
+		//krnl_current_task = hf_queue_remhead(krnl_ps_queue);
 		krnl_task->state = TASK_RUNNING;
 		krnl_pcb.coop_cswitch++;
 #if KERNEL_LOG >= 1
