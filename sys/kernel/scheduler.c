@@ -43,7 +43,7 @@ static void process_delay_queue(void)
 	}
 }
 
-static void ps_queue_next()
+void ps_queue_next()
 {
 	krnl_task = hf_queue_remhead(krnl_ps_queue);
 	if (!krnl_task)
