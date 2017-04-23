@@ -1,17 +1,17 @@
-/** 
+/**
  * @file task.c
  * @author Sergio Johann Filho
  * @date March 2016
- * 
+ *
  * @section LICENSE
  *
  * This source code is licensed under the GNU General Public License,
  * Version 2.  See the file 'doc/license/gpl-2.0.txt' for more details.
- * 
+ *
  * @section DESCRIPTION
- * 
+ *
  * Task management primitives and auxiliary functions.
- * 
+ *
  */
 
 #include <hal.h>
@@ -27,9 +27,9 @@
 
 /**
  * @brief Get a task id by its name.
- * 
+ *
  * @param name is a pointer to an array holding the task name.
- * 
+ *
  * @return task id if the task is found and ERR_INVALID_NAME otherwise.
  */
 int32_t hf_id(int8_t *name)
@@ -50,9 +50,9 @@ int32_t hf_id(int8_t *name)
 
 /**
  * @brief Get a task name by its id.
- * 
+ *
  * @param id is a task id number.
- * 
+ *
  * @return task name if the task is found and NULL otherwise.
  */
 int8_t *hf_name(uint16_t id)
@@ -68,7 +68,7 @@ int8_t *hf_name(uint16_t id)
 
 /**
  * @brief Get the current task id.
- * 
+ *
  * @return current task id.
  */
 uint16_t hf_selfid(void)
@@ -81,7 +81,7 @@ uint16_t hf_selfid(void)
 
 /**
  * @brief Get the current task name.
- * 
+ *
  * @return current task name.
  */
 int8_t *hf_selfname(void)
@@ -94,9 +94,9 @@ int8_t *hf_selfname(void)
 
 /**
  * @brief Get the current state of a task.
- * 
+ *
  * @param id is a task id number.
- * 
+ *
  * @return task state the task if found (TASK_IDLE, TASK_READY, TASK_RUNNING, TASK_BLOCKED, TASK_DELAYED or TASK_WAITING) and ERR_INVALID_ID otherwise.
  */
 int32_t hf_state(uint16_t id)
@@ -112,9 +112,9 @@ int32_t hf_state(uint16_t id)
 
 /**
  * @brief Get the number of executed jobs of a task.
- * 
+ *
  * @param id is a task id number.
- * 
+ *
  * @return jobs executed by the task if found and ERR_INVALID_ID otherwise.
  */
 int32_t hf_jobs(uint16_t id)
@@ -134,9 +134,9 @@ int32_t hf_jobs(uint16_t id)
 
 /**
  * @brief Get the number of deadline misses of a task.
- * 
+ *
  * @param id is a task id number.
- * 
+ *
  * @return deadlines missed by the task if found and ERR_INVALID_ID otherwise.
  */
 int32_t hf_dlm(uint16_t id){
@@ -151,16 +151,16 @@ int32_t hf_dlm(uint16_t id){
 
 /**
  * @brief Set the priority of a best effort task.
- * 
+ *
  * @param id is a task id number.
  * @param priority is the task priority ([1 .. 29] - critical, [30 .. 99] - system, [100 .. 255] - application)
- * 
+ *
  * @return ERR_OK if the task exists and is a best effort one or ERR_INVALID_ID otherwise.
  */
 int32_t hf_priorityset(uint16_t id, uint8_t priority)
 {
 	struct tcb_entry *krnl_task2;
-	
+
 #if KERNEL_LOG == 2
 	dprintf("hf_priorityset() %d ", (uint32_t)_read_us());
 #endif
@@ -170,7 +170,7 @@ int32_t hf_priorityset(uint16_t id, uint8_t priority)
 			if (krnl_task2->period == 0){
 				krnl_task2->priority = priority;
 				krnl_task2->priority_rem = priority;
-				
+
 				return ERR_OK;
 			}
 		}
@@ -180,15 +180,15 @@ int32_t hf_priorityset(uint16_t id, uint8_t priority)
 
 /**
  * @brief Get the priority of a best effort task.
- * 
+ *
  * @param id is a task id number.
- * 
+ *
  * @return task priority if the task exists and is a best effort one or ERR_INVALID_ID otherwise.
  */
 int32_t hf_priorityget(uint16_t id)
 {
 	struct tcb_entry *krnl_task2;
-	
+
 #if KERNEL_LOG == 2
 	dprintf("hf_priorityget() %d ", (uint32_t)_read_us());
 #endif
@@ -204,18 +204,18 @@ int32_t hf_priorityget(uint16_t id)
 
 /**
  * @brief Spawn a new task.
- * 
+ *
  * @param task is a pointer to a task function / body.
  * @param period is the task RT period (in quantum / tick units).
  * @param capacity is the amount of work to be executed in a period (in quantum / tick units).
  * @param deadline is the task deadline to complete the work in the period (in quantum / tick units).
  * @param name is a string used to identify a task.
  * @param stack_size is the stack memory to be allocated for the task.
- * 
+ *
  * @return task id if the task is created, ERR_EXCEED_MAX_NUM if the maximum number of tasks in the system
  * is exceeded, ERR_INVALID_PARAMETER if impossible RT parameters are specified or ERR_OUT_OF_MEMORY if
  * the system fails to allocate memory for the task resources.
- * 
+ *
  * If a task has defined realtime parameters, it is put on the RT queue, if not
  * (period 0, capacity 0 and deadline 0), it is put on the BE queue.
  * WARNING: Task stack size should be always configured correctly, considering data
@@ -231,7 +231,7 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 #endif
 	if ((period < capacity) || (deadline < capacity))
 		return ERR_INVALID_PARAMETER;
-	
+
 	status = _di(); //@Pedro?
 	while ((krnl_tcb[i].ptask != 0) && (i < MAX_TASKS)) //@Pedro: procura lugar para colocar a tarefa na lista
 		i++;
@@ -268,11 +268,11 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 		krnl_task->pstack[0] = STACK_MAGIC;
 		kprintf("\nKERNEL: [%s], id: %d, p:%d, c:%d, d:%d, addr: %x, sp: %x, ss: %d bytes", krnl_task->name, krnl_task->id, krnl_task->period, krnl_task->capacity, krnl_task->deadline, krnl_task->ptask, _get_task_sp(krnl_task->id), stack_size);
 		if (period){ //@Pedro: conforme o período a tarefa será adicionada na fila RT ou BE
-			if (hf_queue_addtail(krnl_rt_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT); 
-			else hf_spawn_polling_server(void (*hf_polling_server(), /*uint16_t period*/ 0, /*uint16_t capacity*/ 0, /*uint16_t deadline*/ 0, /*int8_t *name*/ "hf_spawn_polling_server", /*uint32_t stack_size*/ 0);
+			if (hf_queue_addtail(krnl_rt_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
 		} else if(capacity > 0 && deadline == 0) {
+			//printf("Entrou aqui\n");
 			if (hf_queue_addtail(krnl_ps_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
-		}else {
+		} else {
 			if (hf_queue_addtail(krnl_run_queue, krnl_task)) panic(PANIC_CANT_PLACE_RUN);
 		}
 	}else{
@@ -283,92 +283,13 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 	}
 	krnl_task = &krnl_tcb[krnl_current_task];
 	_ei(status); //@Pedro?
-	
+
 	return i;
 }
-
-/**
- * @brief Spawn a new task to Polling Server intervals.
- * 
- * @param task is a pointer to a task function / body.
- * @param period is the task RT period (in quantum / tick units).
- * @param capacity is the amount of work to be executed in a period (in quantum / tick units).
- * @param deadline is the task deadline to complete the work in the period (in quantum / tick units).
- * @param name is a string used to identify a task.
- * @param stack_size is the stack memory to be allocated for the task.
- * 
- * @return task id if the task is created, ERR_EXCEED_MAX_NUM if the maximum number of tasks in the system
- * is exceeded, ERR_INVALID_PARAMETER if impossible RT parameters are specified or ERR_OUT_OF_MEMORY if
- * the system fails to allocate memory for the task resources.
- * 
- * If a task has defined realtime parameters, it is put on the RT queue, if not
- * (period 0, capacity 0 and deadline 0), it is put on the BE queue.
- * WARNING: Task stack size should be always configured correctly, considering data
- * declared on the auto region (local variables) and around 1024 of spare memory for the OS.
- * For example, if you declare a buffer of 5000 bytes, stack size should be at least 6000.
- */
-int32_t hf_spawn_polling_server(void (*task)(), uint16_t period, uint16_t capacity, uint16_t deadline, int8_t *name, uint32_t stack_size)
-{
-	volatile uint32_t status, i = 0;
-
-#if KERNEL_LOG == 2
-	dprintf("hf_spawn() %d ", (uint32_t)_read_us());
-#endif
-	if ((period < capacity) || (deadline < capacity))
-		return ERR_INVALID_PARAMETER;
-	
-	status = _di(); //@Pedro?
-	while ((krnl_tcb[i].ptask != 0) && (i < MAX_TASKS)) //@Pedro: procura lugar para colocar a tarefa na lista
-		i++;
-	if (i == MAX_TASKS){
-		kprintf("\nKERNEL: task not added - MAX_TASKS: %d", MAX_TASKS);
-		_ei(status); //@Pedro?
-		return ERR_EXCEED_MAX_NUM;
-	}
-	krnl_tasks++;
-	krnl_task = &krnl_tcb[i];
-	krnl_task->id = i;
-	strncpy(krnl_task->name, name, sizeof(krnl_task->name));
-	krnl_task->state = TASK_IDLE;
-	krnl_task->priority = 100;
-	krnl_task->priority_rem = 100;
-	krnl_task->delay = 0;
-	krnl_task->period = period;
-	krnl_task->capacity = capacity;
-	krnl_task->deadline = deadline;
-	krnl_task->capacity_rem = capacity;
-	krnl_task->deadline_rem = deadline;
-	krnl_task->rtjobs = 0;
-	krnl_task->bgjobs = 0;
-	krnl_task->deadline_misses = 0;
-	krnl_task->ptask = task;
-	stack_size += 3; //@Pedro?
-	stack_size >>= 2; //@Pedro?
-	stack_size <<= 2; //@Pedro?
-	krnl_task->stack_size = stack_size;
-	krnl_task->pstack = (size_t *)hf_malloc(stack_size);
-	_set_task_sp(krnl_task->id, (size_t)krnl_task->pstack + (stack_size - 4));
-	_set_task_tp(krnl_task->id, krnl_task->ptask);
-	if (krnl_task->pstack){ /*!<krnl_task->pstack = task stack area (bottom) */
-		krnl_task->pstack[0] = STACK_MAGIC;
-		kprintf("\nKERNEL: [%s], id: %d, p:%d, c:%d, d:%d, addr: %x, sp: %x, ss: %d bytes", krnl_task->name, krnl_task->id, krnl_task->period, krnl_task->capacity, krnl_task->deadline, krnl_task->ptask, _get_task_sp(krnl_task->id), stack_size);
-		if (hf_queue_addtail(krnl_rt_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
-	}else{
-		krnl_task->ptask = 0;
-		krnl_tasks--;
-		kprintf("\nKERNEL: task not added (out of memory)");
-		i = ERR_OUT_OF_MEMORY;
-	}
-	krnl_task = &krnl_tcb[krnl_current_task];
-	_ei(status); //@Pedro?
-	
-	return i;
-}
-
 
 /**
  * @brief Yields the current task.
- * 
+ *
  * The current task gives up execution and the best effort scheduler is invoked.
  */
 void hf_yield(void)
@@ -379,7 +300,7 @@ void hf_yield(void)
 	status = _di();
 #if KERNEL_LOG >= 1
 		dprintf("hf_yield() %d ", (uint32_t)_read_us());
-#endif	
+#endif
 	krnl_task = &krnl_tcb[krnl_current_task];
 	rc = setjmp(krnl_task->task_context);
 	if (rc){
@@ -407,7 +328,7 @@ void hf_yield(void)
 
 /**
  * @brief Yields the current task.
- * 
+ *
  * The current task gives up execution and the best effort scheduler is invoked.
  */
 void hf_polling_server(void)
@@ -419,7 +340,7 @@ void hf_polling_server(void)
 	status = _di();
 #if KERNEL_LOG >= 1
 		dprintf("hf_polling_server() %d ", (uint32_t)_read_us());
-#endif	
+#endif
 	krnl_task = &krnl_tcb[krnl_current_task];
 	rc = setjmp(krnl_task->task_context);
 	if (rc){
@@ -436,8 +357,12 @@ void hf_polling_server(void)
 
 		if (k == 0)
 			hf_yield();
-
 		//Decrementar a capacidade dela.. quando chegar no 0 killa
+
+		if (krnl_task->capacity == 0)
+			hf_kill(hf_selfid());
+		else
+			krnl_task->capacity--;
 
 		krnl_current_task = ps_queue_next();
 		krnl_task->state = TASK_RUNNING;
@@ -454,11 +379,11 @@ void hf_polling_server(void)
 
 /**
  * @brief Blocks a task.
- * 
+ *
  * @param id is a task id number.
- * 
+ *
  * @return ERR_OK on success, ERR_INVALID_ID if the referenced task does not exist or ERR_ERROR if the task is already in the blocked state.
- * 
+ *
  * The task is marked as TASK_BLOCKED so the scheduler doesn't select it as a candidate for scheduling.
  * The blocking state is acomplished without removing the task from the run queue, reducing the cost of
  * the operation in cases where the task state is switched frequently (such as in semaphore primitives).
@@ -492,18 +417,18 @@ int32_t hf_block(uint16_t id)
 	krnl_task->state = TASK_BLOCKED;
 	krnl_task = &krnl_tcb[krnl_current_task];
 	_ei(status); //@Pedro?
-	
+
 	return ERR_OK;
 }
 
 /**
  * @brief Resumes a blocked task.
- * 
+ *
  * @param id is a task id number.
- * 
+ *
  * @return ERR_OK on success, ERR_INVALID_ID if the referenced task does not exist or ERR_ERROR if the task is not in the blocked state.
- * 
- * The task must be in the TASK_BLOCKED state in order to be resumed. 
+ *
+ * The task must be in the TASK_BLOCKED state in order to be resumed.
  * The task is marked as TASK_BLOCKED so the scheduler doesn't select it as a candidate for scheduling.
  * The blocking state is acomplished without removing the task from the run queue, reducing the cost of
  * the operation in cases where the task state is switched frequently (such as in semaphore primitives).
@@ -543,11 +468,11 @@ int32_t hf_resume(uint16_t id)
 
 /**
  * @brief Kills a task.
- * 
+ *
  * @param id is a task id number.
- * 
+ *
  * @return ERR_OK on success or ERR_INVALID_ID if the referenced task does not exist.
- * 
+ *
  * All memory allocated during the task initialization is freed, the TCB entry is cleared and
  * the task is removed from its run queue.
  */
@@ -600,7 +525,7 @@ int32_t hf_kill(uint16_t id)
 		krnl_task2 = hf_queue_remhead(krnl_run_queue);
 	}
 	if (!krnl_task2 || krnl_task2 != krnl_task) panic(PANIC_UNKNOWN_TASK_STATE);
-	
+
 	krnl_task = &krnl_tcb[krnl_current_task];
 	kprintf("\nKERNEL: task died, id: %d, tasks left: %d", id, krnl_tasks);
 	if (hf_selfid() == id){
@@ -615,12 +540,12 @@ int32_t hf_kill(uint16_t id)
 
 /**
  * @brief Delays a task for an amount of time.
- * 
+ *
  * @param id is a task id number.
  * @param delay is the amount of time (in quantum / tick units).
- * 
+ *
  * @return ERR_OK on success or ERR_INVALID_ID if the referenced task does not exist.
- * 
+ *
  * A task is removed from its run queue and its state is marked as TASK_DELAYED. The task is put on the delay queue
  * and remains there until the dispatcher places it back to its run queue. Time is managed by the task dispatcher, which
  * counts down delays, controls the delay queue by cycling the tasks and removing them when the task delay has passed.
@@ -635,7 +560,7 @@ int32_t hf_delay(uint16_t id, uint32_t delay)
 	dprintf("hf_delay() %d ", (uint32_t)_read_us());
 #endif
 	if (delay == 0) return ERR_ERROR;
-	
+
 	status = _di();
 	if (id == 0){
 		kprintf("\nKERNEL: can't delay the idle task");
@@ -666,12 +591,12 @@ int32_t hf_delay(uint16_t id, uint32_t delay)
 			if (hf_queue_swap(krnl_run_queue, j, j-1)) panic(PANIC_CANT_SWAP);
 		krnl_task2 = hf_queue_remhead(krnl_run_queue);
 	}
-	
+
 	krnl_task->state = TASK_DELAYED;
 	krnl_task->delay = delay;
 	if (hf_queue_addtail(krnl_delay_queue, krnl_task2)) panic(PANIC_CANT_PLACE_DELAY);
 	krnl_task = &krnl_tcb[krnl_current_task];
 	_ei(status);
-	
+
 	return ERR_OK;
 }
