@@ -268,9 +268,9 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 		krnl_task->pstack[0] = STACK_MAGIC;
 		kprintf("\nKERNEL: [%s], id: %d, p:%d, c:%d, d:%d, addr: %x, sp: %x, ss: %d bytes", krnl_task->name, krnl_task->id, krnl_task->period, krnl_task->capacity, krnl_task->deadline, krnl_task->ptask, _get_task_sp(krnl_task->id), stack_size);
 		if (period){ //@Pedro: conforme o período a tarefa será adicionada na fila RT ou BE
-			if (hf_queue_addtail(krnl_rt_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
-			
-		}else if(capacity > 0 && deadline == 0) {
+			if (hf_queue_addtail(krnl_rt_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT); 
+			else hf_spawn_polling_server(void (*hf_polling_server(), /*uint16_t period*/ 0, /*uint16_t capacity*/ 0, /*uint16_t deadline*/ 0, /*int8_t *name*/ "hf_spawn_polling_server", /*uint32_t stack_size*/ 0);
+		} else if(capacity > 0 && deadline == 0) {
 			if (hf_queue_addtail(krnl_ps_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
 		}else {
 			if (hf_queue_addtail(krnl_run_queue, krnl_task)) panic(PANIC_CANT_PLACE_RUN);
@@ -286,6 +286,85 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 	
 	return i;
 }
+
+/**
+ * @brief Spawn a new task to Polling Server intervals.
+ * 
+ * @param task is a pointer to a task function / body.
+ * @param period is the task RT period (in quantum / tick units).
+ * @param capacity is the amount of work to be executed in a period (in quantum / tick units).
+ * @param deadline is the task deadline to complete the work in the period (in quantum / tick units).
+ * @param name is a string used to identify a task.
+ * @param stack_size is the stack memory to be allocated for the task.
+ * 
+ * @return task id if the task is created, ERR_EXCEED_MAX_NUM if the maximum number of tasks in the system
+ * is exceeded, ERR_INVALID_PARAMETER if impossible RT parameters are specified or ERR_OUT_OF_MEMORY if
+ * the system fails to allocate memory for the task resources.
+ * 
+ * If a task has defined realtime parameters, it is put on the RT queue, if not
+ * (period 0, capacity 0 and deadline 0), it is put on the BE queue.
+ * WARNING: Task stack size should be always configured correctly, considering data
+ * declared on the auto region (local variables) and around 1024 of spare memory for the OS.
+ * For example, if you declare a buffer of 5000 bytes, stack size should be at least 6000.
+ */
+int32_t hf_spawn_polling_server(void (*task)(), uint16_t period, uint16_t capacity, uint16_t deadline, int8_t *name, uint32_t stack_size)
+{
+	volatile uint32_t status, i = 0;
+
+#if KERNEL_LOG == 2
+	dprintf("hf_spawn() %d ", (uint32_t)_read_us());
+#endif
+	if ((period < capacity) || (deadline < capacity))
+		return ERR_INVALID_PARAMETER;
+	
+	status = _di(); //@Pedro?
+	while ((krnl_tcb[i].ptask != 0) && (i < MAX_TASKS)) //@Pedro: procura lugar para colocar a tarefa na lista
+		i++;
+	if (i == MAX_TASKS){
+		kprintf("\nKERNEL: task not added - MAX_TASKS: %d", MAX_TASKS);
+		_ei(status); //@Pedro?
+		return ERR_EXCEED_MAX_NUM;
+	}
+	krnl_tasks++;
+	krnl_task = &krnl_tcb[i];
+	krnl_task->id = i;
+	strncpy(krnl_task->name, name, sizeof(krnl_task->name));
+	krnl_task->state = TASK_IDLE;
+	krnl_task->priority = 100;
+	krnl_task->priority_rem = 100;
+	krnl_task->delay = 0;
+	krnl_task->period = period;
+	krnl_task->capacity = capacity;
+	krnl_task->deadline = deadline;
+	krnl_task->capacity_rem = capacity;
+	krnl_task->deadline_rem = deadline;
+	krnl_task->rtjobs = 0;
+	krnl_task->bgjobs = 0;
+	krnl_task->deadline_misses = 0;
+	krnl_task->ptask = task;
+	stack_size += 3; //@Pedro?
+	stack_size >>= 2; //@Pedro?
+	stack_size <<= 2; //@Pedro?
+	krnl_task->stack_size = stack_size;
+	krnl_task->pstack = (size_t *)hf_malloc(stack_size);
+	_set_task_sp(krnl_task->id, (size_t)krnl_task->pstack + (stack_size - 4));
+	_set_task_tp(krnl_task->id, krnl_task->ptask);
+	if (krnl_task->pstack){ /*!<krnl_task->pstack = task stack area (bottom) */
+		krnl_task->pstack[0] = STACK_MAGIC;
+		kprintf("\nKERNEL: [%s], id: %d, p:%d, c:%d, d:%d, addr: %x, sp: %x, ss: %d bytes", krnl_task->name, krnl_task->id, krnl_task->period, krnl_task->capacity, krnl_task->deadline, krnl_task->ptask, _get_task_sp(krnl_task->id), stack_size);
+		if (hf_queue_addtail(krnl_rt_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
+	}else{
+		krnl_task->ptask = 0;
+		krnl_tasks--;
+		kprintf("\nKERNEL: task not added (out of memory)");
+		i = ERR_OUT_OF_MEMORY;
+	}
+	krnl_task = &krnl_tcb[krnl_current_task];
+	_ei(status); //@Pedro?
+	
+	return i;
+}
+
 
 /**
  * @brief Yields the current task.
@@ -339,7 +418,7 @@ void hf_polling_server(void)
 
 	status = _di();
 #if KERNEL_LOG >= 1
-		dprintf("hf_yield() %d ", (uint32_t)_read_us());
+		dprintf("hf_polling_server() %d ", (uint32_t)_read_us());
 #endif	
 	krnl_task = &krnl_tcb[krnl_current_task];
 	rc = setjmp(krnl_task->task_context);
@@ -357,6 +436,8 @@ void hf_polling_server(void)
 
 		if (k == 0)
 			hf_yield();
+
+		//Decrementar a capacidade dela.. quando chegar no 0 killa
 
 		krnl_current_task = ps_queue_next();
 		krnl_task->state = TASK_RUNNING;
