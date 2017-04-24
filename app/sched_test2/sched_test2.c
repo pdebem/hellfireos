@@ -21,6 +21,7 @@ void polling_server(void)
 		dprintf("hf_polling_server() %d ", (uint32_t)_read_us());
 #endif
 	krnl_task = &krnl_tcb[krnl_current_task];
+	printf("Krnl Task %d\n", hf_selfid());
 	rc = setjmp(krnl_task->task_context);
 	if (rc){
 		_ei(status);
@@ -33,25 +34,19 @@ void polling_server(void)
 	if (krnl_tasks > 0){
 		//Size of queue
 		k = hf_queue_count(krnl_ps_queue);
-		//printf("Capacidade da fila %d", k);
 		if (k == 0){
 			hf_yield();
-			return;
 		}
-		//Decrementar a capacidade dela.. quando chegar no 0 killa
+		printf("Capacidade da fila  %d\n", hf_queue_count(krnl_ps_queue));
 
 		if (krnl_task->capacity == 0)
 			hf_kill(hf_selfid());
 		else
 			krnl_task->capacity--;
 
-		// Erro aqui
-		krnl_current_task = hf_queue_remhead(krnl_ps_queue);
-		// if (!krnl_current_task)
-		// 	panic(PANIC_NO_TASKS_RT);
-		// if (hf_queue_addtail(krnl_ps_queue, krnl_current_task))
-		// 	panic(PANIC_CANT_PLACE_RT);
-		// krnl_current_task = hf_queue_remhead(krnl_ps_queue);
+		krnl_task = hf_queue_remhead(krnl_ps_queue);
+		printf("Current task: %d", krnl_task->id);
+		printf("Capacidade da fila agora  %d\n", hf_queue_count(krnl_ps_queue));
 		krnl_task->state = TASK_RUNNING;
 		krnl_pcb.coop_cswitch++;
 #if KERNEL_LOG >= 1
@@ -68,9 +63,6 @@ void polling_server(void)
 
 
 void aperiodic(void){
-	// int i = 0;
-	// int32_t jobs, id;
-	// id = hf_selfid();
 	printf("I'm a APERIODIC task and my ID is %d\n", hf_selfid());
 	delay_ms(1);			// do not hog the CPU!
 	hf_yield();
@@ -78,9 +70,6 @@ void aperiodic(void){
 
 
 void best_effort(void){
-	// int i = 0;
-	// int32_t jobs, id;
-	// id = hf_selfid();
 	printf("I'm a BEST EFFORT task and my ID is %d\n", hf_selfid());
 	delay_ms(1);			// do not hog the CPU!
 	hf_yield();
@@ -89,9 +78,6 @@ void best_effort(void){
 
 
 void real_time(void){
-	// int i = 0;
-	// int32_t jobs, id;
-	// id = hf_selfid();
 	hf_mtxlock(&m);
 	printf("I'm a REAL TIME task and my ID is %d\n", hf_selfid());
 	hf_mtxunlock(&m);
@@ -110,15 +96,11 @@ void real_time(void){
 void app_main(void){
 	int i = 0;
 	hf_mtxinit(&m);
-	char *taskName[] = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"};
-	for(; i < NUMBER_OF_PROCESSORS+0; ++i){
-		hf_spawn(aperiodic, 0, 2, 0, taskName[i], 1024);
-	}
-	for(; i < NUMBER_OF_PROCESSORS+2; ++i){
-		hf_spawn(best_effort, 0, 0, 0, taskName[i], 1024);
-	}
-	for(; i < NUMBER_OF_PROCESSORS+5; ++i){
-		hf_spawn(real_time, 2, 2, 2, taskName[i], 1024);
-		hf_spawn(polling_server, 3, 2, 3, taskName[i+3], 1024);
-	}
+
+	hf_spawn(aperiodic, 0, 2, 0, "A1", 1024);
+	hf_spawn(aperiodic, 0, 2, 0, "A2", 1024);
+	hf_spawn(aperiodic, 0, 2, 0, "A3", 1024);
+	hf_spawn(best_effort, 0, 0, 0, "BF", 1024);
+	hf_spawn(polling_server, 3, 4, 3, "polling", 1024);
+	hf_spawn(real_time, 2, 1, 2, "RT", 1024);
 }
