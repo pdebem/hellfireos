@@ -85,12 +85,16 @@ static void clear_pcb(void)
 static void init_queues(void)
 {
 	krnl_run_queue = hf_queue_create(MAX_TASKS);
+	// printf("\n         ENDEREÇO FISICO NA MEMÓRIA DA FILA BE: %x", &krnl_run_queue);
 	if (krnl_run_queue == NULL) panic(PANIC_OOM);
 	krnl_delay_queue = hf_queue_create(MAX_TASKS);
+	// printf("\n         ENDEREÇO FISICO NA MEMÓRIA DA FILA DELAY: %x", &krnl_delay_queue);
 	if (krnl_delay_queue == NULL) panic(PANIC_OOM);
 	krnl_rt_queue = hf_queue_create(MAX_TASKS);
+	// printf("\n         ENDEREÇO FISICO NA MEMÓRIA DA FILA RT: %x", &krnl_rt_queue);
 	if (krnl_rt_queue == NULL) panic(PANIC_OOM);
 	krnl_ps_queue = hf_queue_create(MAX_TASKS);
+	// printf("\n         ENDEREÇO FISICO NA MEMÓRIA DA FILA PS: %x", &krnl_ps_queue);
 	if (krnl_ps_queue == NULL) panic(PANIC_OOM);
 }
 

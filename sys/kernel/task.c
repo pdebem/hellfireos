@@ -229,7 +229,7 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 #if KERNEL_LOG == 2
 	dprintf("hf_spawn() %d ", (uint32_t)_read_us());
 #endif
-	if ((period < capacity) || (deadline < capacity))
+	if (strcmp(name,"idle task") == 0)//((period < capacity) || (deadline < capacity))
 		return ERR_INVALID_PARAMETER;
 
 	status = _di(); //@Pedro?
@@ -264,16 +264,23 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 	krnl_task->pstack = (size_t *)hf_malloc(stack_size);
 	_set_task_sp(krnl_task->id, (size_t)krnl_task->pstack + (stack_size - 4));
 	_set_task_tp(krnl_task->id, krnl_task->ptask);
+	printf("\n\nNome Task: %s - Capacidade: %d - Periodo: %d - DeadLine: %d ", name, capacity, period, deadline);
 	if (krnl_task->pstack){ /*!<krnl_task->pstack = task stack area (bottom) */
 		krnl_task->pstack[0] = STACK_MAGIC;
 		kprintf("\nKERNEL: [%s], id: %d, p:%d, c:%d, d:%d, addr: %x, sp: %x, ss: %d bytes", krnl_task->name, krnl_task->id, krnl_task->period, krnl_task->capacity, krnl_task->deadline, krnl_task->ptask, _get_task_sp(krnl_task->id), stack_size);
 		if (period){ //@Pedro: conforme o período a tarefa será adicionada na fila RT ou BE
+			printf("\n ADD RT ");
 			if (hf_queue_addtail(krnl_rt_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
-		} else if(capacity > 0 && deadline == 0) {
-
+			printf("Tamanho da fila: [%d] | ENDEREÇO FILA[%x] \n\n\n", hf_queue_count(krnl_rt_queue), &krnl_rt_queue);
+			// 
+		} else if(capacity) {
+			printf("\n ADD PS ");
 			if (hf_queue_addtail(krnl_ps_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
+			printf("Tamanho da fila: [%d] | ENDEREÇO FILA[%x] \n\n\n", hf_queue_count(krnl_ps_queue), &krnl_ps_queue);
 		} else {
+			printf("\n ADD BE ");
 			if (hf_queue_addtail(krnl_run_queue, krnl_task)) panic(PANIC_CANT_PLACE_RUN);
+			printf("Tamanho da fila: [%d] | ENDEREÇO FILA[%x] \n\n\n", hf_queue_count(krnl_run_queue), &krnl_run_queue);
 		}
 	}else{
 		krnl_task->ptask = 0;
@@ -333,6 +340,7 @@ void hf_yield(void)
  */
 void hf_polling_server(void)
 {
+	printf("\n CHAMADA DO POLLING SERVER!!! \n");
 	int32_t rc;
 	int32_t i, k;
 	volatile int32_t status;
@@ -354,9 +362,11 @@ void hf_polling_server(void)
 	if (krnl_tasks > 0){
 		//Size of queue
 		k = hf_queue_count(krnl_ps_queue);
-
-		if (k == 0)
+		//printf("Capacidade da fila %d", k);
+		if (k == 0){
 			hf_yield();
+			return;
+		}
 		//Decrementar a capacidade dela.. quando chegar no 0 killa
 
 		if (krnl_task->capacity == 0)
@@ -364,8 +374,13 @@ void hf_polling_server(void)
 		else
 			krnl_task->capacity--;
 
-		//Erro aqui
-		//krnl_current_task = hf_queue_remhead(krnl_ps_queue);
+		// Erro aqui
+		krnl_current_task = hf_queue_remhead(krnl_ps_queue);
+		// if (!krnl_current_task)
+		// 	panic(PANIC_NO_TASKS_RT);
+		// if (hf_queue_addtail(krnl_ps_queue, krnl_current_task))
+		// 	panic(PANIC_CANT_PLACE_RT);
+		// krnl_current_task = hf_queue_remhead(krnl_ps_queue);
 		krnl_task->state = TASK_RUNNING;
 		krnl_pcb.coop_cswitch++;
 #if KERNEL_LOG >= 1
