@@ -273,7 +273,7 @@ int32_t hf_spawn(void (*task)(), uint16_t period, uint16_t capacity, uint16_t de
 			if (hf_queue_addtail(krnl_rt_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
 			printf("Tamanho da fila: [%d] | ENDEREÇO FILA[%x] \n\n\n", hf_queue_count(krnl_rt_queue), &krnl_rt_queue);
 			// 
-		} else if(capacity && !deadline) {
+		} else if(capacity) {
 			printf("\n ADD PS ");
 			if (hf_queue_addtail(krnl_ps_queue, krnl_task)) panic(PANIC_CANT_PLACE_RT);
 			printf("Tamanho da fila: [%d] | ENDEREÇO FILA[%x] \n\n\n", hf_queue_count(krnl_ps_queue), &krnl_ps_queue);

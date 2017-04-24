@@ -2,16 +2,16 @@
  * @file scheduler.c
  * @author Sergio Johann Filho
  * @date February 2016
- *
+ * 
  * @section LICENSE
  *
  * This source code is licensed under the GNU General Public License,
  * Version 2.  See the file 'doc/license/gpl-2.0.txt' for more details.
- *
+ * 
  * @section DESCRIPTION
- *
+ * 
  * Kernel two-level scheduler and task queue management.
-d *
+ * 
  */
 
 #include <hal.h>
@@ -43,13 +43,6 @@ static void process_delay_queue(void)
 	}
 }
 
-void ps_queue_next()
-{
-	krnl_task = hf_queue_remhead(krnl_ps_queue);
-	if (!krnl_task)
-		panic(PANIC_NO_TASKS_RT);
-}
-
 static void run_queue_next()
 {
 	krnl_task = hf_queue_remhead(krnl_run_queue);
@@ -71,13 +64,13 @@ static void rt_queue_next()
 
 /**
  * @brief Task dispatcher.
- *
+ * 
  * The job of the dispatcher is simple: save the current task context on the TCB,
  * update its state to ready and check its stack for overflow. If there are
  * tasks to be scheduled, process the delay queue and invoke the real-time scheduler.
  * If no RT tasks are ready to be scheduled, invoke the best effort scheduler.
  * Update the scheduled task state to running and restore the context of the task.
- *
+ * 
  * Delayed tasks are in the delay queue, and are processed in the following way:
  *	- The number of elements (tasks) in queue is counted;
  *	- The a task from the head of the queue is removed and its delay is decremented;
@@ -85,7 +78,7 @@ static void rt_queue_next()
  * 		- It is put it back on the tail of the delay queue otherwise;
  *	- Repeat until the whole queue is processed;
  */
-
+ 
 void dispatch_isr(void *arg)
 {
 	int32_t rc;
@@ -94,23 +87,23 @@ void dispatch_isr(void *arg)
 	dprintf("dispatch %d ", (uint32_t)_read_us());
 #endif
 	_timer_reset();
-	if (krnl_schedule == 0) return; // @Pedro: Flag para controle do escalonador, ativou ou inativo, se inativo retorna a função VAZIA
-	krnl_task = &krnl_tcb[krnl_current_task]; // @Pedro: recupera o ponteiro para a proxima Task da lista
-	rc = setjmp(krnl_task->task_context); // @Pedro? ACHO que coloca para processar?????
+	if (krnl_schedule == 0) return;
+	krnl_task = &krnl_tcb[krnl_current_task];
+	rc = setjmp(krnl_task->task_context);
 	if (rc){
 		return;
 	}
-	if (krnl_task->state == TASK_RUNNING) // @Pedro: verifica se está em RUNNING, se sim altera para READY
+	if (krnl_task->state == TASK_RUNNING)
 		krnl_task->state = TASK_READY;
-	if (krnl_task->pstack[0] != STACK_MAGIC) //@Pedro? STACK_MAGIC ?????
+	if (krnl_task->pstack[0] != STACK_MAGIC)
 		panic(PANIC_STACK_OVERFLOW);
 	if (krnl_tasks > 0){
 		process_delay_queue();
-		krnl_current_task = krnl_pcb.sched_rt(); //@Pedro: retorna o ponteiro para o escalonador RT
-		if (krnl_current_task == 0) //@Pedro: verifica se a tarefa corrente é de tempo real, caso contrario ela é de melhor esforço
+		krnl_current_task = krnl_pcb.sched_rt();
+		if (krnl_current_task == 0)
 			krnl_current_task = krnl_pcb.sched_be();
-		krnl_task->state = TASK_RUNNING; //@Pedro: Coloca a nova tarefa em TASK_RUNNING
-		krnl_pcb.preempt_cswitch++; //@Pedro? Previsão de troca de contexto ????
+		krnl_task->state = TASK_RUNNING;
+		krnl_pcb.preempt_cswitch++;
 #if KERNEL_LOG >= 1
 		dprintf("\n%d %d %d %d %d ", krnl_current_task, krnl_task->period, krnl_task->capacity, krnl_task->deadline, (uint32_t)_read_us());
 #endif
@@ -123,9 +116,9 @@ void dispatch_isr(void *arg)
 
 /**
  * @brief Best effort (BE) scheduler.
- *
+ * 
  * @return Best effort task id.
- *
+ * 
  * The algorithm is Round Robin.
  * 	- Take a task from the run queue, copy its entry and put it back at the tail of the run queue.
  * 	- If the task is in the blocked state (it may be simply blocked or waiting in a semaphore), it is
@@ -149,9 +142,9 @@ int32_t sched_rr(void)
 
 /**
  * @brief Best effort (BE) scheduler.
- *
+ * 
  * @return Best effort task id.
- *
+ * 
  * The algorithm is Lottery Scheduling.
  * 	- Take a task from the run queue, copy its entry and put it back at the tail of the run queue.
  * 	- If the task is in the blocked state (it may be simply blocked or waiting in a semaphore) or
@@ -160,7 +153,7 @@ int32_t sched_rr(void)
 int32_t sched_lottery(void)
 {
 	int32_t r, i = 0;
-
+	
 	r = random() % krnl_tasks;
 	if (hf_queue_count(krnl_run_queue) == 0)
 		panic(PANIC_NO_TASKS_RUN);
@@ -174,9 +167,9 @@ int32_t sched_lottery(void)
 
 /**
  * @brief Best effort (BE) scheduler.
- *
+ * 
  * @return Best effort task id.
- *
+ * 
  * The algorithm is priority based Round Robin.
  * 	- Take the first task and put it at the end of the run queue (to advance the queue and avoid deadlocks)
  * 	- Perform a run in the queue, searching for the task with the highest priority (non blocked, lowest remaining priority)
@@ -190,7 +183,7 @@ int32_t sched_priorityrr(void)
 	int32_t i, k;
 	uint8_t highestp = 255;
 	struct tcb_entry *krnl_task2 = NULL;
-
+	
 	k = hf_queue_count(krnl_run_queue);
 	if (k == 0)
 		panic(PANIC_NO_TASKS_RUN);
@@ -211,7 +204,7 @@ int32_t sched_priorityrr(void)
 			krnl_task2 = krnl_task;
 		}
 	}
-
+	
 	/* update priorities of all tasks */
 	for (i = 0; i < k; i++){
 		run_queue_next();
@@ -223,15 +216,15 @@ int32_t sched_priorityrr(void)
 	krnl_task->priority_rem = krnl_task->priority;
 done:
 	krnl_task->bgjobs++;
-
+	
 	return krnl_task->id;
 }
 
 /**
  * @brief Real time (RT) scheduler.
- *
+ * 
  * @return Real time task id.
- *
+ * 
  * The scheduling algorithm is Rate Monotonic.
  * 	- Sort the queue of RT tasks by period;
  * 	- Update real time information (remaining deadline and capacity) of the
@@ -246,11 +239,11 @@ int32_t sched_rma(void)
 	int32_t i, j, k;
 	uint16_t id = 0;
 	struct tcb_entry *e1, *e2;
-
+	
 	k = hf_queue_count(krnl_rt_queue);
 	if (k == 0)
 		return 0;
-
+		
 	for (i = 0; i < k-1; i++){
 		for (j = i + 1; j < k; j++){
 			e1 = hf_queue_get(krnl_rt_queue, i);
@@ -275,57 +268,6 @@ int32_t sched_rma(void)
 	}
 
 	if (id){
-		krnl_task = &krnl_tcb[id];
-		krnl_task->rtjobs++;
-		return id;
-	}else{
-		/* no RT task to run */
-		krnl_task = &krnl_tcb[0];
-		return 0;
-	}
-}
-
-/**
- * @brief Polling Server (PS) scheduler.
- *
- * @return aperiodic task id.
- *
- */
-
-int32_t sched_ps(void)
-{
-	int32_t i, j, k;
-	uint16_t id = 0;
-	struct tcb_entry *e1, *e2;
-
-	k = hf_queue_count(krnl_rt_queue); //@Pedro: guarda a quantidade de elementos que contem na fila RT em k
-	if (k == 0)
-		return 0;
-
-	for (i = 0; i < k-1; i++){ //@Pedro: ordena os elementos da fila do menor que tem o menor periodo para o que tem o maior periodo
-		for (j = i + 1; j < k; j++){
-			e1 = hf_queue_get(krnl_rt_queue, i); //@Pedro: pega o elemento I da fila
-			e2 = hf_queue_get(krnl_rt_queue, j); //@Pedro: pega o elemento J da fila
-			if (e1->period > e2->period)
-				if (hf_queue_swap(krnl_rt_queue, i, j)) //Pedro: faz swap entre os elementos da fila, caso o e1 tenha o periodo maior que o do e2
-					panic(PANIC_CANT_SWAP);
-		}
-	}
-
-	for (i = 0; i < k; i++){ //@Pedro: percorre a fila de tarefas
-		rt_queue_next();
-		if (krnl_task->state != TASK_BLOCKED && krnl_task->capacity_rem > 0 && !id){
-			id = krnl_task->id;
-			--krnl_task->capacity_rem; //@Pedro: decrementa a capacidade restante da tarefa
-		}
-		if (--krnl_task->deadline_rem == 0){ //@Pedro: decrementa a deadline e continua se ainda for > 0
-			krnl_task->deadline_rem = krnl_task->period;
-			if (krnl_task->capacity_rem > 0) krnl_task->deadline_misses++; //@Pedro: se (capacidade_restante > 0 ) incrementa deadline_misses
-			krnl_task->capacity_rem = krnl_task->capacity; // caso (capacidade_restante <= 0 ) então capacidade_restante = capacidade
-		}
-	}
-
-	if (id){ //@Pedro: se o ID for válido então incrementa rtJobs
 		krnl_task = &krnl_tcb[id];
 		krnl_task->rtjobs++;
 		return id;

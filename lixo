@@ -1,19 +1,16 @@
-#include <hellfire.h>
 
-#define NUMBER_OF_PROCESSORS 2
 
-mutex_t m;
 
 /**
  * @brief Yields the current task.
  *
  * The current task gives up execution and the best effort scheduler is invoked.
  */
-void polling_server(void)
+void hf_polling_server(void)
 {
-	printf("I'm a POLLING SERVER task\n");
+	printf("\n CHAMADA DO POLLING SERVER!!! \n");
 	int32_t rc;
-	int32_t k;
+	int32_t i, k;
 	volatile int32_t status;
 
 	status = _di();
@@ -61,64 +58,5 @@ void polling_server(void)
 		panic(PANIC_UNKNOWN);
 	}else{
 		panic(PANIC_NO_TASKS_LEFT);
-	}
-	delay_ms(1);			// do not hog the CPU!
-}
-
-
-
-void aperiodic(void){
-	// int i = 0;
-	// int32_t jobs, id;
-	// id = hf_selfid();
-	printf("I'm a APERIODIC task and my ID is %d\n", hf_selfid());
-	delay_ms(1);			// do not hog the CPU!
-	hf_yield();
-}
-
-
-void best_effort(void){
-	// int i = 0;
-	// int32_t jobs, id;
-	// id = hf_selfid();
-	printf("I'm a BEST EFFORT task and my ID is %d\n", hf_selfid());
-	delay_ms(1);			// do not hog the CPU!
-	hf_yield();
-}
-
-
-
-void real_time(void){
-	// int i = 0;
-	// int32_t jobs, id;
-	// id = hf_selfid();
-	hf_mtxlock(&m);
-	printf("I'm a REAL TIME task and my ID is %d\n", hf_selfid());
-	hf_mtxunlock(&m);
-	delay_ms(1);			// do not hog the CPU!
-	hf_yield();
-}
-
-// void polling(void) {
-// 	int32_t id;
-// 	id = hf_selfid();
-// 	printf("I'm polling server id: %d\n", id);
-// 	hf_polling_server();
-// 	printf("I'm polling server id: %d\n", id);
-// }
-
-void app_main(void){
-	int i = 0;
-	hf_mtxinit(&m);
-	char *taskName[] = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"};
-	for(; i < NUMBER_OF_PROCESSORS+0; ++i){
-		hf_spawn(aperiodic, 0, 2, 0, taskName[i], 1024);
-	}
-	for(; i < NUMBER_OF_PROCESSORS+2; ++i){
-		hf_spawn(best_effort, 0, 0, 0, taskName[i], 1024);
-	}
-	for(; i < NUMBER_OF_PROCESSORS+5; ++i){
-		hf_spawn(real_time, 2, 2, 2, taskName[i], 1024);
-		hf_spawn(polling_server, 3, 2, 3, taskName[i+3], 1024);
 	}
 }
